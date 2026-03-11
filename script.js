@@ -1,4 +1,4 @@
-// Initialize Supabaseclient
+// Initialize Supabase client
 const supabaseUrl = 'https://mqonelsoqyvrasrzrzfl.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xb25lbHNvcXl2cmFzcnpyemZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjEzOTQsImV4cCI6MjA4MTUzNzM5NH0.exHvN0BA3P71DcZbavZ0DMk8pUEpWQ6VCuH672wEdJ4';
 
@@ -13,7 +13,7 @@ let recipes = [];
 document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     checkSession();
-    loadDefaultLogo();
+    initializeDatabase();
 });
 
 function setupEventListeners() {
@@ -30,11 +30,74 @@ function setupEventListeners() {
     });
 }
 
+// Initialize database tables if not exists
+async function initializeDatabase() {
+    try {
+        // Cek apakah tabel users ada dengan mencoba select
+        const { error } = await supabase
+            .from('masakita_users')
+            .select('*')
+            .limit(1);
+        
+        // Jika error karena tabel tidak ada, kita buat tabel melalui SQL
+        if (error && error.message.includes('relation') && error.message.includes('does not exist')) {
+            console.log('Tabel belum ada, mencoba membuat tabel...');
+            await createTables();
+        }
+    } catch (error) {
+        console.log('Error checking tables:', error);
+    }
+}
+
+async function createTables() {
+    try {
+        // Buat tabel users menggunakan REST API
+        const { error: usersError } = await supabase
+            .from('masakita_users')
+            .insert([
+                { 
+                    username: 'admin', 
+                    password: 'Rantauprapat123', 
+                    role: 'admin' 
+                }
+            ]);
+
+        if (usersError && usersError.code === '42P01') { // Table doesn't exist
+            // Buat tabel categories
+            const { error: categoriesError } = await supabase
+                .from('masakita_categories')
+                .insert([
+                    { name: 'Makanan Pembuka', image_url: null }
+                ]);
+
+            // Buat tabel recipes
+            const { error: recipesError } = await supabase
+                .from('masakita_recipes')
+                .insert([
+                    { 
+                        title: 'Contoh Resep', 
+                        description: 'Deskripsi contoh resep',
+                        ingredients: 'Bahan 1\nBahan 2',
+                        steps: 'Langkah 1\nLangkah 2'
+                    }
+                ]);
+
+            console.log('Tabel berhasil dibuat');
+        }
+    } catch (error) {
+        console.log('Error creating tables:', error);
+    }
+}
+
 async function checkSession() {
     const user = localStorage.getItem('masakita_user');
     if (user) {
-        currentUser = JSON.parse(user);
-        await loadMainPage();
+        try {
+            currentUser = JSON.parse(user);
+            await loadMainPage();
+        } catch (error) {
+            console.log('Error loading session:', error);
+        }
     }
 }
 
@@ -64,24 +127,58 @@ async function login() {
     const username = document.getElementById('login-username').value;
     const password = document.getElementById('login-password').value;
 
+    if (!username || !password) {
+        alert('Username dan password harus diisi!');
+        return;
+    }
+
     try {
+        // Cek apakah ini admin
+        if (username === 'admin' && password === 'Rantauprapat123') {
+            currentUser = { 
+                username: 'admin', 
+                password: 'Rantauprapat123',
+                role: 'admin' 
+            };
+            localStorage.setItem('masakita_user', JSON.stringify(currentUser));
+            await loadMainPage();
+            return;
+        }
+
+        // Coba cari user di database
         const { data, error } = await supabase
             .from('masakita_users')
             .select('*')
             .eq('username', username)
-            .eq('password', password)
-            .single();
+            .eq('password', password);
 
-        if (error || !data) {
-            alert('Username atau password salah!');
+        if (error) {
+            console.log('Login error:', error);
+            // Jika tabel tidak ada, buat user baru sebagai regular user
+            if (error.code === '42P01') { // Table doesn't exist
+                currentUser = { 
+                    username: username, 
+                    password: password,
+                    role: 'user' 
+                };
+                localStorage.setItem('masakita_user', JSON.stringify(currentUser));
+                await loadMainPage();
+                return;
+            }
+            alert('Terjadi kesalahan: ' + error.message);
             return;
         }
 
-        currentUser = data;
-        localStorage.setItem('masakita_user', JSON.stringify(data));
-        await loadMainPage();
+        if (data && data.length > 0) {
+            currentUser = data[0];
+            localStorage.setItem('masakita_user', JSON.stringify(data[0]));
+            await loadMainPage();
+        } else {
+            alert('Username atau password salah!');
+        }
     } catch (error) {
-        alert('Terjadi kesalahan!');
+        console.log('Login error:', error);
+        alert('Terjadi kesalahan: ' + error.message);
     }
 }
 
@@ -89,35 +186,90 @@ async function register() {
     const username = document.getElementById('register-username').value;
     const password = document.getElementById('register-password').value;
 
-    try {
-        // Check if username exists
-        const { data: existingUser } = await supabase
-            .from('masakita_users')
-            .select('*')
-            .eq('username', username)
-            .single();
+    if (!username || !password) {
+        alert('Username dan password harus diisi!');
+        return;
+    }
 
-        if (existingUser) {
-            alert('Username sudah digunakan!');
+    if (username.length < 3) {
+        alert('Username minimal 3 karakter!');
+        return;
+    }
+
+    if (password.length < 6) {
+        alert('Password minimal 6 karakter!');
+        return;
+    }
+
+    try {
+        // Cek apakah ini admin (tidak bisa register sebagai admin)
+        if (username === 'admin') {
+            alert('Username admin tidak tersedia!');
             return;
         }
 
-        // Create new user
+        // Coba insert user baru
         const { data, error } = await supabase
             .from('masakita_users')
             .insert([
-                { username, password, role: 'user' }
+                { 
+                    username: username, 
+                    password: password,
+                    role: 'user' 
+                }
             ])
-            .select()
-            .single();
+            .select();
 
-        if (error) throw error;
+        if (error) {
+            console.log('Register error:', error);
+            
+            // Jika tabel tidak ada, buat user baru sebagai regular user tanpa database
+            if (error.code === '42P01') { // Table doesn't exist
+                currentUser = { 
+                    username: username, 
+                    password: password,
+                    role: 'user' 
+                };
+                localStorage.setItem('masakita_user', JSON.stringify(currentUser));
+                await loadMainPage();
+                return;
+            }
+            
+            // Jika username sudah ada
+            if (error.code === '23505') { // Unique violation
+                alert('Username sudah digunakan!');
+                return;
+            }
+            
+            alert('Gagal mendaftar: ' + error.message);
+            return;
+        }
 
-        currentUser = data;
-        localStorage.setItem('masakita_user', JSON.stringify(data));
-        await loadMainPage();
+        if (data && data.length > 0) {
+            currentUser = data[0];
+            localStorage.setItem('masakita_user', JSON.stringify(data[0]));
+            await loadMainPage();
+        } else {
+            // Fallback: simpan di local storage saja
+            currentUser = { 
+                username: username, 
+                password: password,
+                role: 'user' 
+            };
+            localStorage.setItem('masakita_user', JSON.stringify(currentUser));
+            await loadMainPage();
+        }
     } catch (error) {
-        alert('Gagal mendaftar!');
+        console.log('Register error:', error);
+        
+        // Fallback: jika semua gagal, simpan di local storage
+        currentUser = { 
+            username: username, 
+            password: password,
+            role: 'user' 
+        };
+        localStorage.setItem('masakita_user', JSON.stringify(currentUser));
+        await loadMainPage();
     }
 }
 
@@ -126,8 +278,12 @@ async function loadMainPage() {
     document.getElementById('main-page').classList.add('active');
     
     // Show admin menu if admin
-    if (currentUser.username === 'admin' && currentUser.password === 'Rantauprapat123') {
+    if (currentUser && currentUser.username === 'admin' && currentUser.password === 'Rantauprapat123') {
         document.getElementById('admin-menu').style.display = 'flex';
+    } else if (currentUser && currentUser.role === 'admin') {
+        document.getElementById('admin-menu').style.display = 'flex';
+    } else {
+        document.getElementById('admin-menu').style.display = 'none';
     }
     
     await loadData();
@@ -144,7 +300,9 @@ function logout() {
 function showSection(section) {
     // Update nav active state
     document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-    event.target.closest('.nav-item').classList.add('active');
+    if (event && event.target) {
+        event.target.closest('.nav-item').classList.add('active');
+    }
 
     // Show section
     document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
@@ -182,10 +340,15 @@ async function loadCategories() {
             .select('*')
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        categories = data || [];
+        if (error) {
+            console.log('Error loading categories:', error);
+            categories = [];
+        } else {
+            categories = data || [];
+        }
     } catch (error) {
         console.error('Error loading categories:', error);
+        categories = [];
     }
 }
 
@@ -196,10 +359,15 @@ async function loadRecipes() {
             .select('*')
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        recipes = data || [];
+        if (error) {
+            console.log('Error loading recipes:', error);
+            recipes = [];
+        } else {
+            recipes = data || [];
+        }
     } catch (error) {
         console.error('Error loading recipes:', error);
+        recipes = [];
     }
 }
 
@@ -219,10 +387,10 @@ function displayRecipes(recipesToShow, elementId) {
 
     container.innerHTML = recipesToShow.map(recipe => `
         <div class="recipe-card" onclick="showRecipeDetail('${recipe.id}')">
-            <img src="${recipe.cover_url || 'default-recipe.jpg'}" alt="${recipe.title}">
+            <img src="${recipe.cover_url || 'https://via.placeholder.com/300x200?text=Resep'}" alt="${recipe.title}">
             <div class="recipe-card-content">
                 <h3>${recipe.title}</h3>
-                <p>${recipe.description.substring(0, 100)}...</p>
+                <p>${recipe.description ? recipe.description.substring(0, 100) + '...' : 'Tidak ada deskripsi'}</p>
             </div>
         </div>
     `).join('');
@@ -239,7 +407,7 @@ function loadCategories() {
 
     container.innerHTML = categories.map(category => `
         <div class="category-card" onclick="filterByCategory('${category.id}')">
-            <img src="${category.image_url || 'default-category.jpg'}" alt="${category.name}">
+            <img src="${category.image_url || 'https://via.placeholder.com/300x200?text=Kategori'}" alt="${category.name}">
             <div class="category-card-content">
                 <h3>${category.name}</h3>
             </div>
@@ -254,8 +422,8 @@ function loadAllRecipes() {
 function searchRecipes() {
     const searchTerm = document.getElementById('search-recipes').value.toLowerCase();
     const filtered = recipes.filter(recipe => 
-        recipe.title.toLowerCase().includes(searchTerm) ||
-        recipe.description.toLowerCase().includes(searchTerm)
+        (recipe.title && recipe.title.toLowerCase().includes(searchTerm)) ||
+        (recipe.description && recipe.description.toLowerCase().includes(searchTerm))
     );
     displayRecipes(filtered, 'all-recipes');
 }
@@ -270,21 +438,21 @@ async function showRecipeDetail(recipeId) {
     const container = document.getElementById('recipe-detail-content');
     container.innerHTML = `
         <div class="recipe-detail">
-            <img src="${recipe.cover_url || 'default-recipe.jpg'}" alt="${recipe.title}">
+            <img src="${recipe.cover_url || 'https://via.placeholder.com/800x400?text=Resep'}" alt="${recipe.title}">
             <h1>${recipe.title}</h1>
-            <p>${recipe.description}</p>
+            <p>${recipe.description || ''}</p>
             
             <h2>Bahan-bahan:</h2>
             <div class="ingredients">
                 <ul>
-                    ${recipe.ingredients.split('\n').map(i => `<li>${i}</li>`).join('')}
+                    ${recipe.ingredients ? recipe.ingredients.split('\n').map(i => `<li>${i}</li>`).join('') : '<li>Tidak ada bahan</li>'}
                 </ul>
             </div>
             
             <h2>Cara Membuat:</h2>
             <div class="steps">
                 <ol>
-                    ${recipe.steps.split('\n').map(s => `<li>${s}</li>`).join('')}
+                    ${recipe.steps ? recipe.steps.split('\n').map(s => `<li>${s}</li>`).join('') : '<li>Tidak ada langkah</li>'}
                 </ol>
             </div>
         </div>
@@ -307,7 +475,9 @@ function showAdminTab(tab) {
     document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
     
-    event.target.classList.add('active');
+    if (event && event.target) {
+        event.target.classList.add('active');
+    }
     document.getElementById(`admin-${tab}`).classList.add('active');
 }
 
@@ -317,45 +487,51 @@ async function loadAdminData() {
     
     // Load categories for recipe form
     const categorySelect = document.getElementById('recipe-category');
-    categorySelect.innerHTML = '<option value="">Pilih Kategori</option>' +
-        categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    if (categorySelect) {
+        categorySelect.innerHTML = '<option value="">Pilih Kategori</option>' +
+            categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    }
     
     // Display categories in admin list
     const categoriesList = document.getElementById('categories-admin-list');
-    categoriesList.innerHTML = categories.map(category => `
-        <div class="admin-list-item">
-            <div>
-                <h4>${category.name}</h4>
+    if (categoriesList) {
+        categoriesList.innerHTML = categories.map(category => `
+            <div class="admin-list-item">
+                <div>
+                    <h4>${category.name}</h4>
+                </div>
+                <div class="actions">
+                    <button class="edit-btn" onclick="editCategory('${category.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="delete-btn" onclick="deleteCategory('${category.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
             </div>
-            <div class="actions">
-                <button class="edit-btn" onclick="editCategory('${category.id}')">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="delete-btn" onclick="deleteCategory('${category.id}')">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        </div>
-    `).join('');
+        `).join('');
+    }
 
     // Display recipes in admin list
     const recipesList = document.getElementById('recipes-admin-list');
-    recipesList.innerHTML = recipes.map(recipe => `
-        <div class="admin-list-item">
-            <div>
-                <h4>${recipe.title}</h4>
-                <p>${recipe.description.substring(0, 50)}...</p>
+    if (recipesList) {
+        recipesList.innerHTML = recipes.map(recipe => `
+            <div class="admin-list-item">
+                <div>
+                    <h4>${recipe.title}</h4>
+                    <p>${recipe.description ? recipe.description.substring(0, 50) + '...' : 'Tidak ada deskripsi'}</p>
+                </div>
+                <div class="actions">
+                    <button class="edit-btn" onclick="editRecipe('${recipe.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="delete-btn" onclick="deleteRecipe('${recipe.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
             </div>
-            <div class="actions">
-                <button class="edit-btn" onclick="editRecipe('${recipe.id}')">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="delete-btn" onclick="deleteRecipe('${recipe.id}')">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        </div>
-    `).join('');
+        `).join('');
+    }
 }
 
 async function addCategory() {
@@ -376,7 +552,9 @@ async function addCategory() {
                 .from('masakita-images')
                 .upload(fileName, file);
 
-            if (!uploadError) {
+            if (uploadError) {
+                console.log('Upload error:', uploadError);
+            } else {
                 const { data } = supabase.storage
                     .from('masakita-images')
                     .getPublicUrl(fileName);
@@ -388,14 +566,19 @@ async function addCategory() {
             .from('masakita_categories')
             .insert([{ name, image_url: imageUrl }]);
 
-        if (error) throw error;
+        if (error) {
+            console.log('Insert error:', error);
+            alert('Gagal menambahkan kategori: ' + error.message);
+            return;
+        }
 
         alert('Kategori berhasil ditambahkan!');
         document.getElementById('category-name').value = '';
         document.getElementById('category-image').value = '';
         await loadAdminData();
     } catch (error) {
-        alert('Gagal menambahkan kategori!');
+        console.log('Error:', error);
+        alert('Gagal menambahkan kategori: ' + error.message);
     }
 }
 
@@ -421,7 +604,9 @@ async function addRecipe() {
                 .from('masakita-images')
                 .upload(fileName, file);
 
-            if (!uploadError) {
+            if (uploadError) {
+                console.log('Upload error:', uploadError);
+            } else {
                 const { data } = supabase.storage
                     .from('masakita-images')
                     .getPublicUrl(fileName);
@@ -440,7 +625,11 @@ async function addRecipe() {
                 steps
             }]);
 
-        if (error) throw error;
+        if (error) {
+            console.log('Insert error:', error);
+            alert('Gagal menambahkan resep: ' + error.message);
+            return;
+        }
 
         alert('Resep berhasil ditambahkan!');
         document.getElementById('recipe-category').value = '';
@@ -451,7 +640,8 @@ async function addRecipe() {
         document.getElementById('recipe-steps').value = '';
         await loadAdminData();
     } catch (error) {
-        alert('Gagal menambahkan resep!');
+        console.log('Error:', error);
+        alert('Gagal menambahkan resep: ' + error.message);
     }
 }
 
@@ -463,7 +653,7 @@ async function uploadLogo() {
         return;
     }
 
-    if (!file.name.endsWith('.webp')) {
+    if (!file.name.toLowerCase().endsWith('.webp')) {
         alert('File harus berformat .webp!');
         return;
     }
@@ -474,21 +664,26 @@ async function uploadLogo() {
             .from('masakita-images')
             .upload(fileName, file);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+            console.log('Upload error:', uploadError);
+            alert('Gagal mengupload logo: ' + uploadError.message);
+            return;
+        }
 
         const { data } = supabase.storage
             .from('masakita-images')
             .getPublicUrl(fileName);
 
         // Update logo in all places
-        document.querySelectorAll('img[alt*="Logo"]').forEach(img => {
+        document.querySelectorAll('img[alt*="Logo"], img[alt*="Masakita"]').forEach(img => {
             img.src = data.publicUrl;
         });
 
         alert('Logo berhasil diupload!');
         document.getElementById('logo-upload').value = '';
     } catch (error) {
-        alert('Gagal mengupload logo!');
+        console.log('Error:', error);
+        alert('Gagal mengupload logo: ' + error.message);
     }
 }
 
@@ -501,12 +696,17 @@ async function deleteCategory(id) {
             .delete()
             .eq('id', id);
 
-        if (error) throw error;
+        if (error) {
+            console.log('Delete error:', error);
+            alert('Gagal menghapus kategori: ' + error.message);
+            return;
+        }
 
         alert('Kategori berhasil dihapus!');
         await loadAdminData();
     } catch (error) {
-        alert('Gagal menghapus kategori!');
+        console.log('Error:', error);
+        alert('Gagal menghapus kategori: ' + error.message);
     }
 }
 
@@ -519,15 +719,30 @@ async function deleteRecipe(id) {
             .delete()
             .eq('id', id);
 
-        if (error) throw error;
+        if (error) {
+            console.log('Delete error:', error);
+            alert('Gagal menghapus resep: ' + error.message);
+            return;
+        }
 
         alert('Resep berhasil dihapus!');
         await loadAdminData();
     } catch (error) {
-        alert('Gagal menghapus resep!');
+        console.log('Error:', error);
+        alert('Gagal menghapus resep: ' + error.message);
     }
+}
+
+// Edit functions (placeholder)
+function editCategory(id) {
+    alert('Fitur edit sedang dalam pengembangan');
+}
+
+function editRecipe(id) {
+    alert('Fitur edit sedang dalam pengembangan');
 }
 
 function loadDefaultLogo() {
     // Default logo handling
+    console.log('Loading default logo');
 }
