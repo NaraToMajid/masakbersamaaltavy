@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Masakita - Kumpulan Resep Masakan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Landing Page -->
+        <div id="landing-page" class="page active">
+            <div class="landing-container">
+                <img src="logo.webp" alt="Masakita Logo" class="landing-logo" id="landing-logo">
+                <h1 class="landing-title">Masakita</h1>
+                <button class="landing-button" onclick="showAuth()">
+                    Bergabung <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Auth Page -->
+        <div id="auth-page" class="page">
+            <div class="auth-container">
+                <div class="auth-box">
+                    <img src="logo.webp" alt="Masakita Logo" class="auth-logo">
+                    <h2 class="auth-title">Selamat Datang</h2>
+                    
+                    <div class="auth-tabs">
+                        <button class="auth-tab active" onclick="switchAuthTab('login')">Login</button>
+                        <button class="auth-tab" onclick="switchAuthTab('register')">Daftar</button>
+                    </div>
+
+                    <form id="login-form" class="auth-form active">
+                        <div class="form-group">
+                            <label><i class="fas fa-user"></i> Username</label>
+                            <input type="text" id="login-username" placeholder="Masukkan username" required>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-lock"></i> Password</label>
+                            <input type="password" id="login-password" placeholder="Masukkan password" required>
+                        </div>
+                        <button type="submit" class="auth-button">
+                            Login <i class="fas fa-sign-in-alt"></i>
+                        </button>
+                    </form>
+
+                    <form id="register-form" class="auth-form">
+                        <div class="form-group">
+                            <label><i class="fas fa-user"></i> Username</label>
+                            <input type="text" id="register-username" placeholder="Pilih username" required>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-lock"></i> Password</label>
+                            <input type="password" id="register-password" placeholder="Buat password" required>
+                        </div>
+                        <button type="submit" class="auth-button">
+                            Daftar <i class="fas fa-user-plus"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App Page -->
+        <div id="main-page" class="page">
+            <nav class="navbar">
+                <div class="nav-container">
+                    <div class="nav-logo">
+                        <img src="logo.webp" alt="Masakita">
+                        <span>Masakita</span>
+                    </div>
+                    <div class="nav-menu">
+                        <button class="nav-item active" onclick="showSection('home')">
+                            <i class="fas fa-home"></i> Beranda
+                        </button>
+                        <button class="nav-item" onclick="showSection('categories')">
+                            <i class="fas fa-list"></i> Kategori
+                        </button>
+                        <button class="nav-item" onclick="showSection('recipes')">
+                            <i class="fas fa-utensils"></i> Resep
+                        </button>
+                        <button class="nav-item" id="admin-menu" style="display: none;" onclick="showSection('admin')">
+                            <i class="fas fa-cog"></i> Admin
+                        </button>
+                        <button class="nav-item" onclick="logout()">
+                            <i class="fas fa-sign-out-alt"></i> Keluar
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="main-content">
+                <!-- Home Section -->
+                <div id="home-section" class="content-section active">
+                    <div class="hero-section">
+                        <h1>Selamat Datang di Masakita</h1>
+                        <p>Temukan berbagai resep lezat untuk inspirasi masakanmu</p>
+                    </div>
+                    
+                    <div class="featured-recipes">
+                        <h2>Resep Terbaru</h2>
+                        <div class="recipes-grid" id="latest-recipes"></div>
+                    </div>
+                </div>
+
+                <!-- Categories Section -->
+                <div id="categories-section" class="content-section">
+                    <div class="section-header">
+                        <h2>Kategori Resep</h2>
+                    </div>
+                    <div class="categories-grid" id="categories-list"></div>
+                </div>
+
+                <!-- Recipes Section -->
+                <div id="recipes-section" class="content-section">
+                    <div class="section-header">
+                        <h2>Semua Resep</h2>
+                        <div class="search-bar">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="search-recipes" placeholder="Cari resep..." onkeyup="searchRecipes()">
+                        </div>
+                    </div>
+                    <div class="recipes-grid" id="all-recipes"></div>
+                </div>
+
+                <!-- Recipe Detail Section -->
+                <div id="recipe-detail-section" class="content-section">
+                    <button class="back-button" onclick="showRecipes()">
+                        <i class="fas fa-arrow-left"></i> Kembali
+                    </button>
+                    <div id="recipe-detail-content"></div>
+                </div>
+
+                <!-- Admin Section -->
+                <div id="admin-section" class="content-section">
+                    <h2>Panel Admin</h2>
+                    
+                    <div class="admin-tabs">
+                        <button class="admin-tab active" onclick="showAdminTab('categories')">Kategori</button>
+                        <button class="admin-tab" onclick="showAdminTab('recipes')">Resep</button>
+                        <button class="admin-tab" onclick="showAdminTab('settings')">Pengaturan</button>
+                    </div>
+
+                    <!-- Admin Categories -->
+                    <div id="admin-categories" class="admin-tab-content active">
+                        <div class="admin-form">
+                            <h3>Tambah Kategori</h3>
+                            <input type="text" id="category-name" placeholder="Nama Kategori" class="admin-input">
+                            <input type="file" id="category-image" accept="image/*" class="admin-file">
+                            <button onclick="addCategory()" class="admin-button">
+                                <i class="fas fa-plus"></i> Tambah Kategori
+                            </button>
+                        </div>
+                        <div class="admin-list" id="categories-admin-list"></div>
+                    </div>
+
+                    <!-- Admin Recipes -->
+                    <div id="admin-recipes" class="admin-tab-content">
+                        <div class="admin-form">
+                            <h3>Tambah Resep</h3>
+                            <select id="recipe-category" class="admin-input">
+                                <option value="">Pilih Kategori</option>
+                            </select>
+                            <input type="text" id="recipe-title" placeholder="Judul Resep" class="admin-input">
+                            <textarea id="recipe-description" placeholder="Deskripsi" class="admin-input" rows="3"></textarea>
+                            <input type="file" id="recipe-cover" accept="image/*" class="admin-file">
+                            <textarea id="recipe-ingredients" placeholder="Bahan-bahan (pisahkan dengan baris baru)" class="admin-input" rows="5"></textarea>
+                            <textarea id="recipe-steps" placeholder="Langkah-langkah (pisahkan dengan baris baru)" class="admin-input" rows="5"></textarea>
+                            <button onclick="addRecipe()" class="admin-button">
+                                <i class="fas fa-plus"></i> Tambah Resep
+                            </button>
+                        </div>
+                        <div class="admin-list" id="recipes-admin-list"></div>
+                    </div>
+
+                    <!-- Admin Settings -->
+                    <div id="admin-settings" class="admin-tab-content">
+                        <div class="admin-form">
+                            <h3>Upload Logo</h3>
+                            <input type="file" id="logo-upload" accept="image/webp" class="admin-file">
+                            <button onclick="uploadLogo()" class="admin-button">
+                                <i class="fas fa-upload"></i> Upload Logo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="script.js"></script>
+</body>
+</html>
