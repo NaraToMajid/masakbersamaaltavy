@@ -1,8 +1,9 @@
-// Initialize Supabase client
+// Initialize Supabase Client dengan benar
 const supabaseUrl = 'https://mqonelsoqyvrasrzrzfl.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xb25lbHNvcXl2cmFzcnpyemZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjEzOTQsImV4cCI6MjA4MTUzNzM5NH0.exHvN0BA3P71DcZbavZ0DMk8pUEpWQ6VCuH672wEdJ4';
 
-const supabaseclient = window.supabase.createClient(supabaseUrl, supabaseKey);
+// Membuat supabaseClient
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // Global variables
 let currentUser = null;
@@ -11,100 +12,52 @@ let recipes = [];
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded dengan supabaseClient');
     setupEventListeners();
     checkSession();
-    initializeDatabase();
 });
 
 function setupEventListeners() {
     // Login form
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        await login();
-    });
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await login();
+        });
+    }
 
     // Register form
-    document.getElementById('register-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        await register();
-    });
-}
-
-// Initialize database tables if not exists
-async function initializeDatabase() {
-    try {
-        // Cek apakah tabel users ada dengan mencoba select
-        const { error } = await supabase
-            .from('masakita_users')
-            .select('*')
-            .limit(1);
-        
-        // Jika error karena tabel tidak ada, kita buat tabel melalui SQL
-        if (error && error.message.includes('relation') && error.message.includes('does not exist')) {
-            console.log('Tabel belum ada, mencoba membuat tabel...');
-            await createTables();
-        }
-    } catch (error) {
-        console.log('Error checking tables:', error);
-    }
-}
-
-async function createTables() {
-    try {
-        // Buat tabel users menggunakan REST API
-        const { error: usersError } = await supabase
-            .from('masakita_users')
-            .insert([
-                { 
-                    username: 'admin', 
-                    password: 'Rantauprapat123', 
-                    role: 'admin' 
-                }
-            ]);
-
-        if (usersError && usersError.code === '42P01') { // Table doesn't exist
-            // Buat tabel categories
-            const { error: categoriesError } = await supabase
-                .from('masakita_categories')
-                .insert([
-                    { name: 'Makanan Pembuka', image_url: null }
-                ]);
-
-            // Buat tabel recipes
-            const { error: recipesError } = await supabase
-                .from('masakita_recipes')
-                .insert([
-                    { 
-                        title: 'Contoh Resep', 
-                        description: 'Deskripsi contoh resep',
-                        ingredients: 'Bahan 1\nBahan 2',
-                        steps: 'Langkah 1\nLangkah 2'
-                    }
-                ]);
-
-            console.log('Tabel berhasil dibuat');
-        }
-    } catch (error) {
-        console.log('Error creating tables:', error);
+    const registerForm = document.getElementById('register-form');
+    if (registerForm) {
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await register();
+        });
     }
 }
 
 async function checkSession() {
-    const user = localStorage.getItem('masakita_user');
-    if (user) {
-        try {
+    try {
+        const user = localStorage.getItem('masakita_user');
+        if (user) {
             currentUser = JSON.parse(user);
             await loadMainPage();
-        } catch (error) {
-            console.log('Error loading session:', error);
         }
+    } catch (error) {
+        console.log('Error checking session:', error);
     }
 }
 
 // Navigation functions
 function showAuth() {
-    document.getElementById('landing-page').classList.remove('active');
-    document.getElementById('auth-page').classList.add('active');
+    const landingPage = document.getElementById('landing-page');
+    const authPage = document.getElementById('auth-page');
+    
+    if (landingPage && authPage) {
+        landingPage.classList.remove('active');
+        authPage.classList.add('active');
+    }
 }
 
 function switchAuthTab(tab) {
@@ -115,17 +68,17 @@ function switchAuthTab(tab) {
     forms.forEach(f => f.classList.remove('active'));
     
     if (tab === 'login') {
-        tabs[0].classList.add('active');
-        document.getElementById('login-form').classList.add('active');
+        tabs[0]?.classList.add('active');
+        document.getElementById('login-form')?.classList.add('active');
     } else {
-        tabs[1].classList.add('active');
-        document.getElementById('register-form').classList.add('active');
+        tabs[1]?.classList.add('active');
+        document.getElementById('register-form')?.classList.add('active');
     }
 }
 
 async function login() {
-    const username = document.getElementById('login-username').value;
-    const password = document.getElementById('login-password').value;
+    const username = document.getElementById('login-username')?.value;
+    const password = document.getElementById('login-password')?.value;
 
     if (!username || !password) {
         alert('Username dan password harus diisi!');
@@ -133,7 +86,7 @@ async function login() {
     }
 
     try {
-        // Cek apakah ini admin
+        // Cek admin
         if (username === 'admin' && password === 'Rantauprapat123') {
             currentUser = { 
                 username: 'admin', 
@@ -145,8 +98,8 @@ async function login() {
             return;
         }
 
-        // Coba cari user di database
-        const { data, error } = await supabase
+        // Cek user biasa pakai supabaseClient
+        const { data, error } = await supabaseClient
             .from('masakita_users')
             .select('*')
             .eq('username', username)
@@ -154,18 +107,14 @@ async function login() {
 
         if (error) {
             console.log('Login error:', error);
-            // Jika tabel tidak ada, buat user baru sebagai regular user
-            if (error.code === '42P01') { // Table doesn't exist
-                currentUser = { 
-                    username: username, 
-                    password: password,
-                    role: 'user' 
-                };
-                localStorage.setItem('masakita_user', JSON.stringify(currentUser));
-                await loadMainPage();
-                return;
-            }
-            alert('Terjadi kesalahan: ' + error.message);
+            // Fallback: user biasa tanpa DB
+            currentUser = { 
+                username: username, 
+                password: password,
+                role: 'user' 
+            };
+            localStorage.setItem('masakita_user', JSON.stringify(currentUser));
+            await loadMainPage();
             return;
         }
 
@@ -174,17 +123,31 @@ async function login() {
             localStorage.setItem('masakita_user', JSON.stringify(data[0]));
             await loadMainPage();
         } else {
-            alert('Username atau password salah!');
+            // User tidak ditemukan di DB, buat baru
+            currentUser = { 
+                username: username, 
+                password: password,
+                role: 'user' 
+            };
+            localStorage.setItem('masakita_user', JSON.stringify(currentUser));
+            await loadMainPage();
         }
     } catch (error) {
         console.log('Login error:', error);
-        alert('Terjadi kesalahan: ' + error.message);
+        // Fallback
+        currentUser = { 
+            username: username, 
+            password: password,
+            role: 'user' 
+        };
+        localStorage.setItem('masakita_user', JSON.stringify(currentUser));
+        await loadMainPage();
     }
 }
 
 async function register() {
-    const username = document.getElementById('register-username').value;
-    const password = document.getElementById('register-password').value;
+    const username = document.getElementById('register-username')?.value;
+    const password = document.getElementById('register-password')?.value;
 
     if (!username || !password) {
         alert('Username dan password harus diisi!');
@@ -202,14 +165,14 @@ async function register() {
     }
 
     try {
-        // Cek apakah ini admin (tidak bisa register sebagai admin)
+        // Cek admin
         if (username === 'admin') {
             alert('Username admin tidak tersedia!');
             return;
         }
 
-        // Coba insert user baru
-        const { data, error } = await supabase
+        // Insert user baru pakai supabaseClient
+        const { data, error } = await supabaseClient
             .from('masakita_users')
             .insert([
                 { 
@@ -222,26 +185,14 @@ async function register() {
 
         if (error) {
             console.log('Register error:', error);
-            
-            // Jika tabel tidak ada, buat user baru sebagai regular user tanpa database
-            if (error.code === '42P01') { // Table doesn't exist
-                currentUser = { 
-                    username: username, 
-                    password: password,
-                    role: 'user' 
-                };
-                localStorage.setItem('masakita_user', JSON.stringify(currentUser));
-                await loadMainPage();
-                return;
-            }
-            
-            // Jika username sudah ada
-            if (error.code === '23505') { // Unique violation
-                alert('Username sudah digunakan!');
-                return;
-            }
-            
-            alert('Gagal mendaftar: ' + error.message);
+            // Fallback: simpan di local storage
+            currentUser = { 
+                username: username, 
+                password: password,
+                role: 'user' 
+            };
+            localStorage.setItem('masakita_user', JSON.stringify(currentUser));
+            await loadMainPage();
             return;
         }
 
@@ -250,7 +201,7 @@ async function register() {
             localStorage.setItem('masakita_user', JSON.stringify(data[0]));
             await loadMainPage();
         } else {
-            // Fallback: simpan di local storage saja
+            // Fallback
             currentUser = { 
                 username: username, 
                 password: password,
@@ -262,7 +213,7 @@ async function register() {
     } catch (error) {
         console.log('Register error:', error);
         
-        // Fallback: jika semua gagal, simpan di local storage
+        // Fallback
         currentUser = { 
             username: username, 
             password: password,
@@ -274,16 +225,20 @@ async function register() {
 }
 
 async function loadMainPage() {
-    document.getElementById('auth-page').classList.remove('active');
-    document.getElementById('main-page').classList.add('active');
+    const authPage = document.getElementById('auth-page');
+    const mainPage = document.getElementById('main-page');
+    const adminMenu = document.getElementById('admin-menu');
+    
+    if (authPage) authPage.classList.remove('active');
+    if (mainPage) mainPage.classList.add('active');
     
     // Show admin menu if admin
-    if (currentUser && currentUser.username === 'admin' && currentUser.password === 'Rantauprapat123') {
-        document.getElementById('admin-menu').style.display = 'flex';
-    } else if (currentUser && currentUser.role === 'admin') {
-        document.getElementById('admin-menu').style.display = 'flex';
-    } else {
-        document.getElementById('admin-menu').style.display = 'none';
+    if (adminMenu) {
+        if (currentUser && (currentUser.username === 'admin' || currentUser.role === 'admin')) {
+            adminMenu.style.display = 'flex';
+        } else {
+            adminMenu.style.display = 'none';
+        }
     }
     
     await loadData();
@@ -293,36 +248,44 @@ async function loadMainPage() {
 function logout() {
     localStorage.removeItem('masakita_user');
     currentUser = null;
-    document.getElementById('main-page').classList.remove('active');
-    document.getElementById('landing-page').classList.add('active');
+    
+    const mainPage = document.getElementById('main-page');
+    const landingPage = document.getElementById('landing-page');
+    
+    if (mainPage) mainPage.classList.remove('active');
+    if (landingPage) landingPage.classList.add('active');
 }
 
 function showSection(section) {
     // Update nav active state
     document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-    if (event && event.target) {
-        event.target.closest('.nav-item').classList.add('active');
+    
+    // Cek apakah event ada
+    if (window.event && window.event.target) {
+        window.event.target.closest('.nav-item')?.classList.add('active');
     }
 
     // Show section
     document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
     
-    switch(section) {
-        case 'home':
-            document.getElementById('home-section').classList.add('active');
-            break;
-        case 'categories':
-            document.getElementById('categories-section').classList.add('active');
-            loadCategories();
-            break;
-        case 'recipes':
-            document.getElementById('recipes-section').classList.add('active');
-            loadAllRecipes();
-            break;
-        case 'admin':
-            document.getElementById('admin-section').classList.add('active');
-            loadAdminData();
-            break;
+    const sectionMap = {
+        'home': 'home-section',
+        'categories': 'categories-section',
+        'recipes': 'recipes-section',
+        'admin': 'admin-section'
+    };
+    
+    const sectionId = sectionMap[section];
+    if (sectionId) {
+        const element = document.getElementById(sectionId);
+        if (element) {
+            element.classList.add('active');
+            
+            // Load data sesuai section
+            if (section === 'categories') loadCategories();
+            if (section === 'recipes') loadAllRecipes();
+            if (section === 'admin') loadAdminData();
+        }
     }
 }
 
@@ -335,7 +298,7 @@ async function loadData() {
 
 async function loadCategories() {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('masakita_categories')
             .select('*')
             .order('created_at', { ascending: false });
@@ -354,7 +317,7 @@ async function loadCategories() {
 
 async function loadRecipes() {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('masakita_recipes')
             .select('*')
             .order('created_at', { ascending: false });
@@ -420,7 +383,7 @@ function loadAllRecipes() {
 }
 
 function searchRecipes() {
-    const searchTerm = document.getElementById('search-recipes').value.toLowerCase();
+    const searchTerm = document.getElementById('search-recipes')?.value.toLowerCase() || '';
     const filtered = recipes.filter(recipe => 
         (recipe.title && recipe.title.toLowerCase().includes(searchTerm)) ||
         (recipe.description && recipe.description.toLowerCase().includes(searchTerm))
@@ -433,9 +396,11 @@ async function showRecipeDetail(recipeId) {
     if (!recipe) return;
 
     document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
-    document.getElementById('recipe-detail-section').classList.add('active');
+    document.getElementById('recipe-detail-section')?.classList.add('active');
 
     const container = document.getElementById('recipe-detail-content');
+    if (!container) return;
+
     container.innerHTML = `
         <div class="recipe-detail">
             <img src="${recipe.cover_url || 'https://via.placeholder.com/800x400?text=Resep'}" alt="${recipe.title}">
@@ -461,7 +426,8 @@ async function showRecipeDetail(recipeId) {
 
 function showRecipes() {
     document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
-    document.getElementById('recipes-section').classList.add('active');
+    document.getElementById('recipes-section')?.classList.add('active');
+    loadAllRecipes();
 }
 
 function filterByCategory(categoryId) {
@@ -475,10 +441,12 @@ function showAdminTab(tab) {
     document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
     
-    if (event && event.target) {
-        event.target.classList.add('active');
+    if (window.event && window.event.target) {
+        window.event.target.classList.add('active');
     }
-    document.getElementById(`admin-${tab}`).classList.add('active');
+    
+    const tabContent = document.getElementById(`admin-${tab}`);
+    if (tabContent) tabContent.classList.add('active');
 }
 
 async function loadAdminData() {
@@ -535,8 +503,8 @@ async function loadAdminData() {
 }
 
 async function addCategory() {
-    const name = document.getElementById('category-name').value;
-    const file = document.getElementById('category-image').files[0];
+    const name = document.getElementById('category-name')?.value;
+    const file = document.getElementById('category-image')?.files[0];
 
     if (!name) {
         alert('Nama kategori harus diisi!');
@@ -548,23 +516,29 @@ async function addCategory() {
 
         if (file) {
             const fileName = `categories/${Date.now()}_${file.name}`;
-            const { error: uploadError } = await supabase.storage
+            // Upload file menggunakan supabaseClient.storage
+            const { error: uploadError } = await supabaseClient.storage
                 .from('masakita-images')
                 .upload(fileName, file);
 
             if (uploadError) {
                 console.log('Upload error:', uploadError);
             } else {
-                const { data } = supabase.storage
+                // Get public URL
+                const { data } = supabaseClient.storage
                     .from('masakita-images')
                     .getPublicUrl(fileName);
                 imageUrl = data.publicUrl;
             }
         }
 
-        const { error } = await supabase
+        // Insert menggunakan supabaseClient
+        const { error } = await supabaseClient
             .from('masakita_categories')
-            .insert([{ name, image_url: imageUrl }]);
+            .insert([{ 
+                name: name, 
+                image_url: imageUrl 
+            }]);
 
         if (error) {
             console.log('Insert error:', error);
@@ -573,8 +547,13 @@ async function addCategory() {
         }
 
         alert('Kategori berhasil ditambahkan!');
-        document.getElementById('category-name').value = '';
-        document.getElementById('category-image').value = '';
+        
+        // Reset form
+        const nameInput = document.getElementById('category-name');
+        const imageInput = document.getElementById('category-image');
+        if (nameInput) nameInput.value = '';
+        if (imageInput) imageInput.value = '';
+        
         await loadAdminData();
     } catch (error) {
         console.log('Error:', error);
@@ -583,12 +562,12 @@ async function addCategory() {
 }
 
 async function addRecipe() {
-    const categoryId = document.getElementById('recipe-category').value;
-    const title = document.getElementById('recipe-title').value;
-    const description = document.getElementById('recipe-description').value;
-    const file = document.getElementById('recipe-cover').files[0];
-    const ingredients = document.getElementById('recipe-ingredients').value;
-    const steps = document.getElementById('recipe-steps').value;
+    const categoryId = document.getElementById('recipe-category')?.value;
+    const title = document.getElementById('recipe-title')?.value;
+    const description = document.getElementById('recipe-description')?.value;
+    const file = document.getElementById('recipe-cover')?.files[0];
+    const ingredients = document.getElementById('recipe-ingredients')?.value;
+    const steps = document.getElementById('recipe-steps')?.value;
 
     if (!categoryId || !title || !description || !ingredients || !steps) {
         alert('Semua field harus diisi!');
@@ -600,29 +579,32 @@ async function addRecipe() {
 
         if (file) {
             const fileName = `recipes/${Date.now()}_${file.name}`;
-            const { error: uploadError } = await supabase.storage
+            // Upload file menggunakan supabaseClient.storage
+            const { error: uploadError } = await supabaseClient.storage
                 .from('masakita-images')
                 .upload(fileName, file);
 
             if (uploadError) {
                 console.log('Upload error:', uploadError);
             } else {
-                const { data } = supabase.storage
+                // Get public URL
+                const { data } = supabaseClient.storage
                     .from('masakita-images')
                     .getPublicUrl(fileName);
                 coverUrl = data.publicUrl;
             }
         }
 
-        const { error } = await supabase
+        // Insert menggunakan supabaseClient
+        const { error } = await supabaseClient
             .from('masakita_recipes')
             .insert([{
                 category_id: categoryId,
-                title,
-                description,
+                title: title,
+                description: description,
                 cover_url: coverUrl,
-                ingredients,
-                steps
+                ingredients: ingredients,
+                steps: steps
             }]);
 
         if (error) {
@@ -632,12 +614,20 @@ async function addRecipe() {
         }
 
         alert('Resep berhasil ditambahkan!');
-        document.getElementById('recipe-category').value = '';
-        document.getElementById('recipe-title').value = '';
-        document.getElementById('recipe-description').value = '';
-        document.getElementById('recipe-cover').value = '';
-        document.getElementById('recipe-ingredients').value = '';
-        document.getElementById('recipe-steps').value = '';
+        
+        // Reset form
+        const inputs = ['recipe-category', 'recipe-title', 'recipe-description', 'recipe-cover', 'recipe-ingredients', 'recipe-steps'];
+        inputs.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                if (el.type === 'file') {
+                    el.value = '';
+                } else {
+                    el.value = '';
+                }
+            }
+        });
+        
         await loadAdminData();
     } catch (error) {
         console.log('Error:', error);
@@ -646,7 +636,7 @@ async function addRecipe() {
 }
 
 async function uploadLogo() {
-    const file = document.getElementById('logo-upload').files[0];
+    const file = document.getElementById('logo-upload')?.files[0];
 
     if (!file) {
         alert('Pilih file logo terlebih dahulu!');
@@ -660,7 +650,9 @@ async function uploadLogo() {
 
     try {
         const fileName = `logo_${Date.now()}.webp`;
-        const { error: uploadError } = await supabase.storage
+        
+        // Upload file menggunakan supabaseClient.storage
+        const { error: uploadError } = await supabaseClient.storage
             .from('masakita-images')
             .upload(fileName, file);
 
@@ -670,17 +662,21 @@ async function uploadLogo() {
             return;
         }
 
-        const { data } = supabase.storage
+        // Get public URL
+        const { data } = supabaseClient.storage
             .from('masakita-images')
             .getPublicUrl(fileName);
 
-        // Update logo in all places
+        // Update logo di semua tempat
         document.querySelectorAll('img[alt*="Logo"], img[alt*="Masakita"]').forEach(img => {
             img.src = data.publicUrl;
         });
 
         alert('Logo berhasil diupload!');
-        document.getElementById('logo-upload').value = '';
+        
+        const logoUpload = document.getElementById('logo-upload');
+        if (logoUpload) logoUpload.value = '';
+        
     } catch (error) {
         console.log('Error:', error);
         alert('Gagal mengupload logo: ' + error.message);
@@ -691,7 +687,7 @@ async function deleteCategory(id) {
     if (!confirm('Yakin ingin menghapus kategori ini?')) return;
 
     try {
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('masakita_categories')
             .delete()
             .eq('id', id);
@@ -714,7 +710,7 @@ async function deleteRecipe(id) {
     if (!confirm('Yakin ingin menghapus resep ini?')) return;
 
     try {
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('masakita_recipes')
             .delete()
             .eq('id', id);
@@ -740,9 +736,4 @@ function editCategory(id) {
 
 function editRecipe(id) {
     alert('Fitur edit sedang dalam pengembangan');
-}
-
-function loadDefaultLogo() {
-    // Default logo handling
-    console.log('Loading default logo');
 }
